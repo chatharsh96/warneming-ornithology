@@ -1,0 +1,58 @@
+
+
+import dask
+import dask.dataframe as dd
+import dask.array as da 
+import pandas as pd
+import numpy as np
+from sklearn.ensemble import RandomForestRegressor
+from dask_ml.metrics import r2_score
+from dask_ml.model_selection import train_test_split
+from joblib import parallel_backend
+from sklearn.ensemble import RandomForestRegressor
+from dask import delayed
+
+
+
+from dask.distributed import Client
+client = Client(processes=False, threads_per_worker=30,
+                n_workers=5)
+client
+
+path_in = r'5.csv'
+Z = da.from_array(np.loadtxt(path_in, dtype=np.float, delimiter=","))
+Z
+
+X = Z[:,1:]
+Y = Z[:,0]
+xtrain, xtest, ytrain, ytest = train_test_split(X, Y, test_size=0.3, train_size=0.7)
+
+rf = RandomForestRegressor(n_estimators=100, criterion="mse", max_depth=None, max_features="auto", bootstrap=True, min_samples_split=2, n_jobs=1)
+rf
+
+from joblib import parallel_backend
+
+with parallel_backend('dask'):
+    rf.fit(xtrain, ytrain)
+
+ypred = rf.predict(xtest)
+r2 = round(r2_score(ytest, ypred), 2)
+print("RF01: ", r2)
+zipped_rf = list (zip (rf.feature_importances_))
+print(zipped_rf)
+
+import matplotlib.pyplot as plt
+plt.plot(ypred, "o")
+plt.plot(ytest, "*")
+plt.show()
+
+
+xtestnl = pd.read_csv(r'1.csv', header = None, usecols=[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22])
+metadata = pd.read_csv(r'1.csv', header = None, usecols=[0])
+
+
+yprednl = rf.predict(xtestnl).reshape(-1, 1)
+yprednl = np.array(yprednl, int)
+metadata = np.array(metadata, int)
+stack = np.hstack((metadata, yprednl))
+print(stack)
